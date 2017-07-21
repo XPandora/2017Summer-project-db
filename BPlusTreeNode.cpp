@@ -19,25 +19,29 @@ void Node::deleteChildren() {
 		Node* pNode = this->getPointer(i);
 		if (pNode != NULL) {
 			pNode->deleteChildren();
+			delete pNode;
 		}
-		delete pNode;
 	}
 }
 
 Node* Node::getBrother(DIRECTION &direction) {
 	Node* pNode = this->getParent();
+
 	if (pNode == NULL) {
 		return NULL;
 	}
 	Node* bNode;
-	for (int i = 0; i < pNode->getCount(); i++) {
+
+	for (int i = 0; i < pNode->getCount() + 1; i++) {
 		if (pNode->getPointer(i) == this) {
-			direction = LEFT;
-			return pNode->getPointer(i - 1);
-		}
-		else {
-			direction = RIGHT;
-			return pNode->getPointer(i + 1);
+			if (i == pNode->getCount()) {
+				direction = D_LEFT;
+				return pNode->getPointer(i - 1);
+			}
+			else {
+				direction = D_RIGHT;
+				return pNode->getPointer(i + 1);
+			}
 		}
 	}
 }
@@ -133,7 +137,7 @@ KEY_TYPE InternalNode::split(InternalNode* newNode, KEY_TYPE key){
 	int j = 0;
 
 	if ((key > this->getElement(ORDER_V - 1)) &&
-		key < this->getElement(ORDER_V)) 
+		(key < this->getElement(ORDER_V)) )
 	{
 		for (i = ORDER_V; i < MAXNUM_KEY; i++) {
 			newNode->setElement(j, this->getElement(i));
@@ -168,14 +172,14 @@ KEY_TYPE InternalNode::split(InternalNode* newNode, KEY_TYPE key){
 	j = 0;
 	for (i = pos; i < MAXNUM_KEY; i++) {
 		newNode->setElement(j, this->getElement(i));
-		this->setElement(j, INVALID);
+		this->setElement(i, INVALID);
 		j++;
 	}
 
 	j = 0;
-	for (i = pos + 1; i < MAXNUM_POINTER; i++) {
+	for (i = pos; i < MAXNUM_POINTER; i++) {
 		this->getPointer(i)->setParent(newNode);
-		newNode->setPointer(j + 1, this->getPointer(i));
+		newNode->setPointer(j, this->getPointer(i));
 		this->setPointer(i, NULL);
 		j++;
 	}
@@ -185,6 +189,64 @@ KEY_TYPE InternalNode::split(InternalNode* newNode, KEY_TYPE key){
 	newNode->setCount(MAXNUM_KEY - pos);
 
 	return reKey;
+}
+
+bool InternalNode::combine(Node* bNode) {
+	if (this->getCount() + bNode->getCount() + 1 > MAXNUM_KEY) {
+		return false;
+	}
+
+	KEY_TYPE newKey = bNode->getPointer(0)->getElement(0);
+
+	m_Keys[m_Count] = newKey;
+	m_Count++;
+	m_Pointers[m_Count] = bNode->getPointer(0);
+
+	for (int i = 0; i < bNode->getCount(); i++) {
+		m_Keys[m_Count] = bNode->getElement(i);
+		m_Count++;
+		m_Pointers[m_Count] = bNode->getPointer(i + 1);
+	}
+
+	return true;
+}
+
+bool InternalNode::MoveOneElement(Node* pNode) {
+	if (this->getCount() >= MAXNUM_KEY) {
+		return false;
+	}
+
+	int i, j;
+
+	if (pNode->getElement(0) < this->getElement(0) ){
+		for (i = m_Count - 1; i > 0; i--) {
+			m_Keys[i] = m_Keys[i - 1];
+		}
+		
+		for (j = m_Count; j > 0; j--) {
+			m_Pointers[j] = m_Pointers[j - 1];
+		}
+
+		m_Keys[0] = getPointer(0)->getElement(0);
+		m_Pointers[0] = pNode->getPointer(pNode->getCount());
+	}
+	else {
+		m_Keys[m_Count] = pNode->getPointer(0)->getElement(0);
+		m_Pointers[m_Count + 1] = pNode->getPointer(0);
+
+		for (i = 0; i < pNode->getCount() - 1; i++) {
+			pNode->setElement(i, pNode->getElement(i + 1));
+		}
+
+		for (j = 0; j < pNode->getCount(); j++) {
+			pNode->setElement(j, pNode->getElement(j + 1));
+		}
+	}
+
+	this->setCount(this->getCount() + 1);
+	pNode->setCount(pNode->getCount() - 1);
+
+	return true;
 }
 
 LeafNode::LeafNode() {
@@ -198,52 +260,84 @@ LeafNode::~LeafNode() {
 }
 
 KEY_TYPE LeafNode::getElement(int i) {
-	if (i < 0 || i >= MAXNUM_DATA) {
+	if (i < 0 || i >= MAXNUM_KEY) {
 		return INVALID;
 	}
 	else {
-		return m_Datas[i];
+		return m_Keys[i];
 	}
 }
 
 void LeafNode::setElement(int i, KEY_TYPE value) {
-	if (i >= 0 && i < MAXNUM_DATA) {
-		m_Datas[i] = value;
+	if (i >= 0 && i < MAXNUM_KEY) {
+		m_Keys[i] = value;
 	}
 }
 
-bool LeafNode::insert(KEY_TYPE data) {
+INDEX_TYPE LeafNode::getIndex(int i) {
+	if (i < 0 || i >= MAXNUM_DATA) {
+		return INVALID;
+	}
+	else {
+		return m_Indexs[i];
+	}
+}
+
+void LeafNode::setIndex(int i, INDEX_TYPE index) {
+	if (i >= 0 && i < MAXNUM_DATA) {
+		m_Indexs[i] = index;
+	}
+}
+
+bool LeafNode::insert(KEY_TYPE key, INDEX_TYPE index) {
 	if (m_Count >= MAXNUM_DATA) {
 		return false;
 	}
 
 	int i, j;
 
-	for (i = 0; i < m_Count&&m_Datas[i] < data; i++) {
+	for (i = 0; i < m_Count&&m_Keys[i] < key; i++) {
 
 	}
 
 	for (j = m_Count - 1; j >= i; j--) {
-		m_Datas[j + 1] = m_Datas[j];
+		m_Keys[j + 1] = m_Keys[j];
+		m_Indexs[j + 1] = m_Indexs[j];
 	}
 
-	m_Datas[i] = data;
+	m_Keys[i] = key;
+	m_Indexs[i] = index;
 	m_Count++;
 	return true;
 }
 
-bool LeafNode::remove(KEY_TYPE data) {
+bool LeafNode::remove(KEY_TYPE key) {
 	int i, j;
-	for (i = 0; data < m_Datas[i]; i++) {
+	for (i = 0; key > m_Keys[i]; i++) {
 
 	}
 
 	for (j = i; j < m_Count - 1; j++) {
-		m_Datas[j] = m_Datas[j + 1];
+		m_Keys[j] = m_Keys[j + 1];
+		m_Indexs[j] = m_Indexs[j + 1];
 	}
-	m_Datas[j] = INVALID;
+
+	m_Keys[j] = INVALID;
+	m_Indexs[j] = INVALID;
 
 	m_Count--;
+	return true;
+}
+
+bool LeafNode::combine(Node*bNode) {
+	if (this->getCount() + bNode->getCount() > MAXNUM_DATA) {
+		return false;
+	}
+
+	for (int i = 0; i < bNode->getCount(); i++) {
+		this->insert(bNode->getElement(i), bNode->getIndex(i));
+	}
+
 	return true;
 }
 
@@ -253,7 +347,11 @@ KEY_TYPE LeafNode::split(LeafNode* newNode) {
 
 	for (i = ORDER_V; i < MAXNUM_DATA; i++) {
 		newNode->setElement(j, this->getElement(i));
+		newNode->setIndex(j, this->getIndex(i));
+		
 		this->setElement(i, INVALID);
+		this->setIndex(i, INVALID);
+
 		j++;
 	}
 

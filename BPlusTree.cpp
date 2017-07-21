@@ -58,7 +58,7 @@ bool BPlusTree::search(KEY_TYPE data) {
 	return false;
 }
 
-bool BPlusTree::insert(KEY_TYPE data) {
+bool BPlusTree::insert(KEY_TYPE data, INDEX_TYPE index) {
 	if (search(data)) {
 		return false;
 	}
@@ -67,13 +67,13 @@ bool BPlusTree::insert(KEY_TYPE data) {
 
 	if (oldNode == NULL) {
 		oldNode = new LeafNode();
-		oldNode->insert(data);
+		oldNode->insert(data, index);
 		setRoot(oldNode);
 		return true;
 	}
 	
 	if (oldNode->getCount() < MAXNUM_DATA) {
-		return oldNode->insert(data);
+		return oldNode->insert(data, index);
 	}
 
 	LeafNode* newNode = new LeafNode();
@@ -81,10 +81,10 @@ bool BPlusTree::insert(KEY_TYPE data) {
 
 	key = oldNode->split(newNode);
 	if (data < key) {
-		oldNode->insert(data);
+		oldNode->insert(data, index);
 	}
 	else {
-		newNode->insert(data);
+		newNode->insert(data, index);
 	}
 
 	InternalNode* parentNode = (InternalNode*)(oldNode->getParent());
@@ -108,14 +108,96 @@ bool BPlusTree::insert(KEY_TYPE data) {
 }
 
 bool BPlusTree::remove(KEY_TYPE data) {
-	if (search(data)) {
+	if (!search(data)) {
 		return false;
 	}
+
+	LeafNode* oldNode = searchInsertNode(data);
+
+	if (oldNode == NULL) {
+		return false;
+	}
+
+	oldNode->remove(data);
+	InternalNode* pNode = (InternalNode*)oldNode->getParent();
+
+	if (pNode == NULL) {
+		if (oldNode->getCount() == 0) {
+			delete oldNode;
+			setRoot(NULL);
+		}
+		return true;
+	}
+
+	if (oldNode->getCount() >= ORDER_V) {
+		int i;
+
+		for (i = 0; data > pNode->getElement(i) && i < pNode->getCount(); i++) {
+
+		}
+
+		if (data == pNode->getElement(i)) {
+			pNode->setElement(i, oldNode->getElement(0));
+		}
+
+		return true;
+	}
+
+	DIRECTION direction;
+	LeafNode* brotherNode = (LeafNode*)oldNode->getBrother(direction);
+
+	KEY_TYPE newData;
+	INDEX_TYPE newIndex;
+	if (brotherNode->getCount() > ORDER_V) {
+		if (direction == D_LEFT) {
+			newData = brotherNode->getElement(brotherNode->getCount() - 1);
+			newIndex = brotherNode->getIndex(brotherNode->getCount() - 1);
+		}
+		else {
+			newData = brotherNode->getElement(0);
+			newIndex = brotherNode->getIndex(0);
+		}
+
+		oldNode->insert(newData,newIndex);
+		brotherNode->remove(newData);
+
+		if (direction == D_LEFT) {
+			for (int i = 0; i <= pNode->getCount(); i++) {
+				if (pNode->getPointer(i) == oldNode&&i > 0) {
+					pNode->setElement(i - 1, oldNode->getElement(0));
+				}
+			}
+		}
+		else {
+			for (int i = 0; i <= pNode->getCount(); i++) {
+				if (pNode->getPointer(i) == brotherNode&&i > 0) {
+					pNode->setElement(i - 1, brotherNode->getElement(0));
+				}
+			}
+		}
+
+		return true;
+
+	}
+
+	KEY_TYPE newKey;
+
+	if (direction == D_LEFT) {
+		brotherNode->combine(oldNode);
+		newKey = oldNode->getElement(0);
+	}
+	else {
+		oldNode->combine(brotherNode);
+		newKey = brotherNode->getElement(0);
+	}
+
+	return deleteInternalNode(pNode, newKey);
 }
 
 void BPlusTree::print() {
 	Node* root = getRoot();
 	printNode(root);
+	std::cout << std::endl;
 }
 
 LeafNode* BPlusTree::searchInsertNode(KEY_TYPE data) {
@@ -195,6 +277,79 @@ bool BPlusTree::insertToInternal(InternalNode* pNode, KEY_TYPE key, Node* rChild
 	return insertToInternal(pParentNode, reKey, pNewNode);
 }
 
+bool BPlusTree::deleteInternalNode(InternalNode* pNode, KEY_TYPE key) {
+	if (!pNode->remove(key)) {
+		return false;
+	}
+
+	InternalNode* pParentNode = (InternalNode*)pNode->getParent();
+
+	if (pParentNode == NULL) {
+		if (pNode->getCount() == 0) {
+			setRoot(pNode->getPointer(0));
+			delete pNode;
+		}
+		return true;
+	}
+
+	if (pNode->getCount() >= ORDER_V) {
+		int i;
+		for (i = 0; key > pParentNode->getElement(i) && i < pParentNode->getCount(); i++) {
+
+		}
+
+		if (key == pParentNode->getElement(i)) {
+			pParentNode->setElement(i, pNode->getElement(0));
+		}
+
+		return true;
+	}
+
+	DIRECTION direction;
+	InternalNode* pBrotherNode = (InternalNode*)pNode->getBrother(direction);
+
+	KEY_TYPE newData;
+	if (pBrotherNode->getCount() > ORDER_V) {
+		pNode->MoveOneElement(pBrotherNode);
+
+		if (direction == D_LEFT) {
+			for (int i = 0; i < pParentNode->getCount() + 1; i++) {
+				if (pParentNode->getPointer(i) == pNode&&i > 0) {
+					pParentNode->setElement(i - 1, pNode->getElement(0));
+				}
+			}
+		}
+		else {
+			for (int i = 0; i < pParentNode->getCount() + 1; i++) {
+				if (pParentNode->getPointer(i) == pNode&&i > 0) {
+					pParentNode->setElement(i - 1, pNode->getElement(0));
+				}
+
+				if (pParentNode->getPointer(i) == pBrotherNode&&i > 0) {
+					pParentNode->setElement(i - 1, pBrotherNode->getElement(0));
+				}
+			}
+
+		}
+		return true;
+	}
+
+	KEY_TYPE newKey;
+
+	if (direction == D_LEFT) {
+		pBrotherNode->combine(pNode);
+		newKey = pNode->getPointer(0)->getElement(0);
+		delete pNode;
+	}
+	else {
+		pNode->combine(pBrotherNode);
+		newKey = pBrotherNode->getPointer(0)->getElement(0);
+		delete pBrotherNode;
+	}
+
+	return deleteInternalNode(pParentNode, newKey);
+}
+
 bool BPlusTree::check() {
 	Node* root = getRoot();
 	return checkNode(root);
@@ -235,7 +390,7 @@ void BPlusTree::printNode(Node* tNode) {
 
 	if (tNode->getType() == LEAF) {
 		for (int i = 0; i < tNode->getCount(); i++) {
-			std::cout << tNode->getElement(i) << "|";
+			std::cout << tNode->getElement(i) << ":" << tNode->getIndex(i) << "|";
 		}
 		return;
 	}

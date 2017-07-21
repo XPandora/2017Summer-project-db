@@ -10,6 +10,7 @@
 #define INVALID 0
 #define NULL 0
 typedef int KEY_TYPE;
+typedef int INDEX_TYPE;
 
 enum NODE_TYPE {
 	ROOT = 1,		//根节点
@@ -18,8 +19,8 @@ enum NODE_TYPE {
 };
 
 enum DIRECTION {
-	LEFT = 1,
-	RIGHT = 2
+	D_LEFT = 1,
+	D_RIGHT = 2
 };
 
 class Node {
@@ -43,6 +44,10 @@ public:
 	// 获取和设置某个指针，对中间结点指指针，对叶子结点无意义
 	virtual Node* getPointer(int i) = 0;
 	virtual void setPointer(int i, Node* pointer) = 0;
+
+	// 获取和设置某个索引，对中间结点无意义，对叶子结点指索引
+	virtual INDEX_TYPE getIndex(int i) = 0;
+	virtual void setIndex(int i, INDEX_TYPE index) = 0;
 
 	// 获取一个最近的兄弟结点
 	Node* getBrother(DIRECTION &direction);
@@ -68,13 +73,17 @@ public:
 	virtual Node* getPointer(int i);
 	virtual void setPointer(int i, Node* pointer);
 
+	virtual INDEX_TYPE getIndex(int i) { return INVALID; }
+	virtual void setIndex(int i, INDEX_TYPE index) {}
 
 	bool insert(KEY_TYPE data, Node* tNode);
 	bool remove(KEY_TYPE data);
+	bool combine(Node* bNode);
+	bool MoveOneElement(Node* pNode);
 	
 	KEY_TYPE split(InternalNode* newNode, KEY_TYPE key);
 
-protected:
+private:
 	KEY_TYPE m_Keys[MAXNUM_KEY];//键数组
 	Node *m_Pointers[MAXNUM_POINTER];//指针数组
 };
@@ -90,12 +99,17 @@ public:
 	virtual Node* getPointer(int i) { return NULL; }
 	virtual void setPointer(int i, Node* pointer) {}
 
+	virtual INDEX_TYPE getIndex(int i);
+	virtual void setIndex(int i, INDEX_TYPE index);
 
-	bool insert(KEY_TYPE data);
-	bool remove(KEY_TYPE data);
+	bool insert(KEY_TYPE key, INDEX_TYPE index);
+	bool remove(KEY_TYPE key);
+	bool combine(Node* bNode);
 	
 	KEY_TYPE split(LeafNode* newNode);
-protected:
-	KEY_TYPE m_Datas[MAXNUM_DATA];
+
+private:
+	KEY_TYPE m_Keys[MAXNUM_KEY];
+	INDEX_TYPE m_Indexs[MAXNUM_DATA];
 };
-#endif // !1
+#endif // !_BPlusTreeNode_h
