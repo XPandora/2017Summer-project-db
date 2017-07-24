@@ -10,7 +10,9 @@ public:
 
 	bool search(KEY_TYPE data);
 	bool insert(KEY_TYPE data, INDEX_TYPE index);
+	bool modify(KEY_TYPE data, INDEX_TYPE index);
 	bool remove(KEY_TYPE data);
+	INDEX_TYPE fetch(KEY_TYPE data);
 
 	void print();
 	void clear();
@@ -33,7 +35,7 @@ private:
 	//插入键到中间节点
 	bool insertToInternal(InternalNode* pNode, KEY_TYPE key, Node* rChildren);
 	//在中间节点删除键
-	bool deleteInternalNode(InternalNode* pNode, KEY_TYPE key);
+	bool deleteInternalNode(InternalNode* pNode, KEY_TYPE key, KEY_TYPE removeKey);
 	bool checkNode(Node* tNode);
 	void printNode(Node* tNode);
 };

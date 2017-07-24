@@ -38,9 +38,21 @@ Node* Node::getBrother(DIRECTION &direction) {
 				direction = D_LEFT;
 				return pNode->getPointer(i - 1);
 			}
-			else {
+			else if(i == 0){
 				direction = D_RIGHT;
 				return pNode->getPointer(i + 1);
+			}
+			else {
+				Node* rBrother = pNode->getPointer(i + 1);
+				Node* lBrother = pNode->getPointer(i - 1);
+				if (rBrother->getCount() > lBrother->getCount()) {
+					direction = D_RIGHT;
+					return rBrother;
+				}
+				else {
+					direction = D_LEFT;
+					return lBrother;
+				}
 			}
 		}
 	}
@@ -118,6 +130,11 @@ bool InternalNode::remove(KEY_TYPE value) {
 	for (i = 0; value > m_Keys[i]; i++) {
 
 	}
+
+	if (m_Keys[i] != value) {
+		return false;
+	}
+
 	for (j = i; j < m_Count - 1; j++) {
 		m_Keys[j] = m_Keys[j + 1];
 	}
@@ -196,16 +213,18 @@ bool InternalNode::combine(Node* bNode) {
 		return false;
 	}
 
-	KEY_TYPE newKey = bNode->getPointer(0)->getElement(0);
+	KEY_TYPE newKey = bNode->getMinElement();
 
 	m_Keys[m_Count] = newKey;
 	m_Count++;
 	m_Pointers[m_Count] = bNode->getPointer(0);
+	bNode->getPointer(0)->setParent(this);
 
 	for (int i = 0; i < bNode->getCount(); i++) {
 		m_Keys[m_Count] = bNode->getElement(i);
 		m_Count++;
 		m_Pointers[m_Count] = bNode->getPointer(i + 1);
+		bNode->getPointer(i + 1)->setParent(this);
 	}
 
 	return true;
@@ -219,34 +238,62 @@ bool InternalNode::MoveOneElement(Node* pNode) {
 	int i, j;
 
 	if (pNode->getElement(0) < this->getElement(0) ){
-		for (i = m_Count - 1; i > 0; i--) {
+		for (i = m_Count; i > 0; i--) {
 			m_Keys[i] = m_Keys[i - 1];
 		}
 		
-		for (j = m_Count; j > 0; j--) {
+		for (j = m_Count + 1; j > 0; j--) {
 			m_Pointers[j] = m_Pointers[j - 1];
 		}
 
-		m_Keys[0] = getPointer(0)->getElement(0);
+		m_Keys[0] = getMinElement();
 		m_Pointers[0] = pNode->getPointer(pNode->getCount());
+
+		pNode->getPointer(pNode->getCount())->setParent(this);
+
+		pNode->setElement(pNode->getCount() - 1, INVALID);
+		pNode->setPointer(pNode->getCount(), NULL);
+
 	}
 	else {
-		m_Keys[m_Count] = pNode->getPointer(0)->getElement(0);
+		m_Keys[m_Count] = pNode->getMinElement();
 		m_Pointers[m_Count + 1] = pNode->getPointer(0);
+
+		pNode->getPointer(0)->setParent(this);
 
 		for (i = 0; i < pNode->getCount() - 1; i++) {
 			pNode->setElement(i, pNode->getElement(i + 1));
 		}
 
 		for (j = 0; j < pNode->getCount(); j++) {
-			pNode->setElement(j, pNode->getElement(j + 1));
+			pNode->setPointer(j, pNode->getPointer(j + 1));
 		}
+
+		pNode->setElement(pNode->getCount() - 1, INVALID);
+		pNode->setPointer(pNode->getCount(), NULL);
+
 	}
 
 	this->setCount(this->getCount() + 1);
 	pNode->setCount(pNode->getCount() - 1);
 
 	return true;
+}
+
+KEY_TYPE Node::getMinElement() {
+	if (this == NULL || m_Count == 0) {
+		return INVALID;
+	}
+
+	Node* nextNode = this->getPointer(0);
+
+	if (nextNode->getType() == LEAF) {
+		return nextNode->getElement(0);
+	}
+	else {
+		Node* nextNode = this->getPointer(0);
+		return nextNode->getMinElement();
+	}
 }
 
 LeafNode::LeafNode() {

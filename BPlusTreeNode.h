@@ -1,7 +1,7 @@
 #ifndef  _BPlusTreeNode_h
 #define  _BPlusTreeNode_h
 
-#define ORDER_V 2    /* 为简单起见，把v固定为2，实际的B+树v值应该是可配的 */
+#define ORDER_V 16    /* 为简单起见，把v固定为2，实际的B+树v值应该是可配的 */
 
 #define MAXNUM_KEY (ORDER_V * 2)    /* 内部结点中最多键个数，为2v */
 #define MAXNUM_POINTER (MAXNUM_KEY + 1)    /* 内部结点中最多指向子树的指针个数，为2v+1 */
@@ -19,8 +19,8 @@ enum NODE_TYPE {
 };
 
 enum DIRECTION {
-	D_LEFT = 1,
-	D_RIGHT = 2
+	D_LEFT = 1,    //左方向
+	D_RIGHT = 2    //右方向
 };
 
 class Node {
@@ -51,6 +51,8 @@ public:
 
 	// 获取一个最近的兄弟结点
 	Node* getBrother(DIRECTION &direction);
+	// 获得结点中最小的元素
+	KEY_TYPE getMinElement();
 
 	// 删除结点
 	void deleteChildren();
@@ -110,6 +112,6 @@ public:
 
 private:
 	KEY_TYPE m_Keys[MAXNUM_KEY];
-	INDEX_TYPE m_Indexs[MAXNUM_DATA];
+	INDEX_TYPE m_Indexs[MAXNUM_DATA];//索引数组
 };
 #endif // !_BPlusTreeNode_h

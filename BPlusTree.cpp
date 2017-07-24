@@ -27,6 +27,7 @@ bool BPlusTree::search(KEY_TYPE data) {
 	}
 
 	while (tNode != NULL) {
+		NODE_TYPE type = tNode->getType();
 		if (tNode->getType() == LEAF) {
 			break;
 		}
@@ -37,7 +38,7 @@ bool BPlusTree::search(KEY_TYPE data) {
 		}
 
 		for (int i = 0; i < tNode->getCount(); i++) {
-			if (i == tNode->getCount() - 1 && data > tNode->getElement(i)) {
+			if (i == tNode->getCount() - 1 && data >= tNode->getElement(i)) {
 				tNode = tNode->getPointer(i + 1);
 				break;
 			}
@@ -107,6 +108,23 @@ bool BPlusTree::insert(KEY_TYPE data, INDEX_TYPE index) {
 	return insertToInternal(parentNode, key, newNode);
 }
 
+bool BPlusTree::modify(KEY_TYPE data, INDEX_TYPE index) {
+	/*if (!search(data)) {
+		return false;
+	}*/
+
+	LeafNode* tNode = searchInsertNode(data);
+
+	for (int i = 0; i < tNode->getCount(); i++) {
+		if (data == tNode->getElement(i)) {
+			tNode->setIndex(i, index);
+			return true;
+		}
+	}
+
+	return false;
+}
+
 bool BPlusTree::remove(KEY_TYPE data) {
 	if (!search(data)) {
 		return false;
@@ -132,13 +150,16 @@ bool BPlusTree::remove(KEY_TYPE data) {
 	if (oldNode->getCount() >= ORDER_V) {
 		int i;
 
-		for (i = 0; data > pNode->getElement(i) && i < pNode->getCount(); i++) {
-
+		if (pNode->getPointer(0) == oldNode) {
+			return deleteInternalNode(pNode, data, data);
 		}
 
-		if (data == pNode->getElement(i)) {
-			pNode->setElement(i, oldNode->getElement(0));
+		for (i = 0; i < pNode->getCount() + 1; i++) {
+			if (oldNode == pNode->getPointer(i)&&i > 0) {
+				pNode->setElement(i - 1, oldNode->getElement(0));
+			}//attention
 		}
+
 
 		return true;
 	}
@@ -183,15 +204,32 @@ bool BPlusTree::remove(KEY_TYPE data) {
 	KEY_TYPE newKey;
 
 	if (direction == D_LEFT) {
+		if (data < oldNode->getElement(0)) {
+			newKey = data;
+		}
+		else {
+			newKey = oldNode->getElement(0);
+		}
 		brotherNode->combine(oldNode);
-		newKey = oldNode->getElement(0);
 	}
 	else {
-		oldNode->combine(brotherNode);
 		newKey = brotherNode->getElement(0);
+		oldNode->combine(brotherNode);
 	}
 
-	return deleteInternalNode(pNode, newKey);
+	return deleteInternalNode(pNode, newKey, data);
+}
+
+INDEX_TYPE BPlusTree::fetch(KEY_TYPE data) {
+	LeafNode* tNode = searchInsertNode(data);
+
+	for (int i = 0; i < tNode->getCount(); i++) {
+		if (data == tNode->getElement(i)) {
+			return tNode->getIndex(i);
+		}
+	}
+
+	return INVALID;
 }
 
 void BPlusTree::print() {
@@ -218,7 +256,7 @@ LeafNode* BPlusTree::searchInsertNode(KEY_TYPE data) {
 		}
 
 		for (int i = 0; i < tNode->getCount(); i++) {
-			if (i == tNode->getCount() - 1 && data > tNode->getElement(i)) {
+			if (i == tNode->getCount() - 1 && data >= tNode->getElement(i)) {
 				tNode = tNode->getPointer(i + 1);
 				break;
 			}
@@ -277,15 +315,14 @@ bool BPlusTree::insertToInternal(InternalNode* pNode, KEY_TYPE key, Node* rChild
 	return insertToInternal(pParentNode, reKey, pNewNode);
 }
 
-bool BPlusTree::deleteInternalNode(InternalNode* pNode, KEY_TYPE key) {
-	if (!pNode->remove(key)) {
-		return false;
-	}
+bool BPlusTree::deleteInternalNode(InternalNode* pNode, KEY_TYPE key, KEY_TYPE removeKey) {
+	pNode->remove(key);
 
 	InternalNode* pParentNode = (InternalNode*)pNode->getParent();
 
 	if (pParentNode == NULL) {
 		if (pNode->getCount() == 0) {
+			pNode->getPointer(0)->setParent(NULL);
 			setRoot(pNode->getPointer(0));
 			delete pNode;
 		}
@@ -294,12 +331,15 @@ bool BPlusTree::deleteInternalNode(InternalNode* pNode, KEY_TYPE key) {
 
 	if (pNode->getCount() >= ORDER_V) {
 		int i;
-		for (i = 0; key > pParentNode->getElement(i) && i < pParentNode->getCount(); i++) {
 
+		if (pParentNode->getPointer(0) == pNode) {
+			return deleteInternalNode(pParentNode, key, removeKey);
 		}
 
-		if (key == pParentNode->getElement(i)) {
-			pParentNode->setElement(i, pNode->getElement(0));
+		for (i = 0; i < pParentNode->getCount() + 1; i++) {
+			if (pParentNode->getPointer(i) == pNode&&i > 0) {
+				pParentNode->setElement(i - 1, pNode->getMinElement());
+			}
 		}
 
 		return true;
@@ -315,18 +355,18 @@ bool BPlusTree::deleteInternalNode(InternalNode* pNode, KEY_TYPE key) {
 		if (direction == D_LEFT) {
 			for (int i = 0; i < pParentNode->getCount() + 1; i++) {
 				if (pParentNode->getPointer(i) == pNode&&i > 0) {
-					pParentNode->setElement(i - 1, pNode->getElement(0));
+					pParentNode->setElement(i - 1, pNode->getMinElement());
 				}
 			}
 		}
 		else {
 			for (int i = 0; i < pParentNode->getCount() + 1; i++) {
 				if (pParentNode->getPointer(i) == pNode&&i > 0) {
-					pParentNode->setElement(i - 1, pNode->getElement(0));
+					pParentNode->setElement(i - 1, pNode->getMinElement());
 				}
 
 				if (pParentNode->getPointer(i) == pBrotherNode&&i > 0) {
-					pParentNode->setElement(i - 1, pBrotherNode->getElement(0));
+					pParentNode->setElement(i - 1, pBrotherNode->getMinElement());
 				}
 			}
 
@@ -338,16 +378,21 @@ bool BPlusTree::deleteInternalNode(InternalNode* pNode, KEY_TYPE key) {
 
 	if (direction == D_LEFT) {
 		pBrotherNode->combine(pNode);
-		newKey = pNode->getPointer(0)->getElement(0);
+		if (removeKey < pNode->getMinElement()) {
+			newKey = removeKey;
+		}
+		else {
+			newKey = pNode->getMinElement();
+		}
 		delete pNode;
 	}
 	else {
 		pNode->combine(pBrotherNode);
-		newKey = pBrotherNode->getPointer(0)->getElement(0);
+		newKey = pBrotherNode->getMinElement();
 		delete pBrotherNode;
 	}
 
-	return deleteInternalNode(pParentNode, newKey);
+	return deleteInternalNode(pParentNode, newKey, removeKey);
 }
 
 bool BPlusTree::check() {
